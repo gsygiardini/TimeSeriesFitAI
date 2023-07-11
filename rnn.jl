@@ -66,12 +66,11 @@ function genData(T)
     λ = [rand() for i ∈ 1:size(x_axis)[1]]
     μ = [rand() for i ∈ 1:size(x_axis)[1]]
 
-#     print(M_t(10, λ, μ))
-
     # Pre train functions
 #     λ = train(λ, λ_pre, 100, :mse)
 #     μ = train(μ, μ_pre, 100, :mse)
 
+    #Testing the trained output
     print(train_RK(λ, y_axis, μ, 10, :r2))
 
 #     scatter(μ, label="Predicted")
@@ -114,65 +113,7 @@ function train_RK(γ_train, γ_real, aux, epochs, optimize::Symbol)
 #     return vcat(result...)
 end
 
-function train(Y_train, Y_real, epochs, optimize::Symbol)
-    Y_train = [[y] for y ∈ Y_train] # Reshape input data into Flux recurrent data format
-    Y_real = [[y] for y ∈ Y_real] # Reshape input data into Flux recurrent data format
-
-    model = Chain(
-        RNN(1 => 32, relu),
-        Dense(32 => 1, identity) # Create a recurrent model
-    )
-
-    opt = ADAM() # Select the optimizer function from FLUX
-
-    θ = Flux.params(model) # Keep track of the model parameters
-
-    if optimize == :mse
-        model(Y_train[1]) # Warm-up the model
-        for epoch ∈ 1:epochs # Training loop for MSE
-            Flux.reset!(model) # Reset the hidden state of the RNN
-            ∇ = gradient(θ) do # Compute the gradient of the mean squared error loss
-                sum(Flux.Losses.mse.([model(y)[1] for y ∈ Y_train[2:end]], Y_real[2:end])) # Calculate the sum of squared errors
-            end
-            Flux.update!(opt, θ, ∇) # Update the parameters
-        end
-    elseif optimize == :r2
-        model(Y_train[1]) # Warm-up the model
-        for epoch ∈ 1:epochs # Training loop for R2
-            Flux.reset!(model) # Reset the hidden state of the RNN
-            ∇ = gradient(θ) do # Compute the gradient of the R2 error
-                y_pred = [model(y)[1] for y ∈ Y_train[2:end]] # Calculate the predicted values
-                y_real = [y[1] for y ∈ Y_real[2:end]] # Get the real values
-                ssr = sum((y_pred .- y_real).^2) # Calculate the sum of squared residuals
-                sst = sum((y_real .- mean(y_real)).^2) # Calculate the total sum of squares
-                1.0 - ssr/sst # Calculate R2 score
-            end
-            Flux.update!(opt, θ, ∇) # Update the parameters
-        end
-    else
-        throw(ArgumentError("Invalid optimization option. Use :mse or :r2."))
-    end
-
-    result = [model(y)[1] for y ∈ Y_train[2:end]]
-    return vcat(result...)
-end
-
 ##################################################################################
 ################################## Main Program ##################################
 ##################################################################################
-
 genData(10)
-
-# epochs = 30
-#
-# n=1
-# X = series[1:end-n]
-# Y = series[1+n:end]
-# time_x = time[1:end-n]
-# time_y = time[1+n:end]
-#
-# X_real = [[y] for y ∈ Y]
-#
-# scatter(train(X, Y, epochs, :r2), label="Predicted")
-# scatter!(vcat(X_real...), label="Actual")
-# savefig("fig.png")
